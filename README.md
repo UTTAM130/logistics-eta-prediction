@@ -1,100 +1,264 @@
-# Logistics ETA Prediction & Delay Detection
+# Logistics ETA Prediction & Delay Intelligence
 
-A reproducible synthetic logistics-data project that creates shipment master/transaction data,
-validates relationships and timestamps, trains ETA and delay models, exposes predictions through
-FastAPI, and displays operational KPIs in Streamlit.
+An end-to-end Machine Learning solution that predicts shipment Estimated Time of Arrival (ETA), identifies potential delivery delays, and provides operational insights through an interactive dashboard.
 
-## Stack
-Python, Pandas, NumPy, scikit-learn, SQLite, FastAPI, Streamlit, pytest.
+The system combines carrier tracking events, route information, weather conditions, and facility queue data to estimate delivery times and highlight delay risks.
 
-## Quick start (Windows PowerShell)
+## Key Features
+
+- Synthetic logistics data generation with reproducible results.
+- Data validation and relationship integrity checks.
+- Shipment ETA prediction using Machine Learning.
+- Delivery delay-risk classification.
+- Tracking event analysis and shipment-level search.
+- What-if ETA prediction based on operational conditions.
+- REST API using FastAPI.
+- Interactive operational dashboard using Streamlit.
+- Model evaluation metrics and data checksums.
+- Automated tests using pytest.
+
+## Technology Stack
+
+- **Language:** Python
+- **Data Processing:** Pandas, NumPy
+- **Machine Learning:** Scikit-learn
+- **Backend:** FastAPI, Uvicorn
+- **Dashboard:** Streamlit
+- **Database:** SQLite
+- **Testing:** Pytest
+- **Model Storage:** Joblib
+
+## Project Architecture
+
+```text
+logistics-eta-prediction/
+│
+├── app/
+│   ├── api.py
+│   └── dashboard.py
+│
+├── data/
+│   ├── raw/
+│   └── processed/
+│
+├── models/
+│   ├── eta_model.joblib
+│   └── delay_model.joblib
+│
+├── src/
+│   ├── __init__.py
+│   ├── config.py
+│   ├── generate.py
+│   ├── validate.py
+│   ├── model.py
+│   └── run_pipeline.py
+│
+├── tests/
+│   └── test_project.py
+│
+├── requirements.txt
+├── .gitignore
+└── README.md
+```
+
+## Installation and Setup
+
+### 1. Clone the repository
+
+```powershell
+git clone https://github.com/UTTAM130/logistics-eta-prediction.git
+```
+
+```powershell
+cd logistics-eta-prediction
+```
+
+### 2. Create a virtual environment
+
 ```powershell
 py -m venv .venv
-.\\.venv\\Scripts\\Activate.ps1
+```
+
+### 3. Activate the environment
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
+### 4. Install dependencies
+
+```powershell
 python -m pip install --upgrade pip
+```
+
+```powershell
 pip install -r requirements.txt
+```
+
+## Run the Complete ML Pipeline
+
+Generate synthetic data, validate datasets, train models, evaluate performance, and create processed outputs:
+
+```powershell
 python -m src.run_pipeline --shipments 5000 --seed 20261022
 ```
 
-For the requested full synthetic volume:
+For a larger synthetic dataset:
+
 ```powershell
 python -m src.run_pipeline --shipments 50000 --seed 20261022
 ```
 
-Run the API (in terminal 1):
+## Run the Application
+
+### Start FastAPI Backend
+
+Open the first terminal:
+
+```powershell
+cd C:\CandidateWorkspace\logistics-eta-prediction
+```
+
+```powershell
+.\.venv\Scripts\Activate.ps1
+```
+
 ```powershell
 uvicorn app.api:app --reload
 ```
-Open http://127.0.0.1:8000/docs
 
-Run the dashboard (in terminal 2):
+API documentation:
+
+http://127.0.0.1:8000/docs
+
+### Start Streamlit Dashboard
+
+Open a second terminal:
+
 ```powershell
-streamlit run app/dashboard.py
+cd C:\CandidateWorkspace\logistics-eta-prediction
 ```
 
-Run tests:
 ```powershell
-pytest -q
+.\.venv\Scripts\Activate.ps1
 ```
 
-## Reproducibility
-The generator uses a fixed NumPy seed. Running twice with the same shipment count and seed
-recreates the same CSV contents. `data/processed/validation_summary.json` records row counts
-and validation results. `data/processed/checksums.json` contains SHA-256 checksums.
+Set the Python import path:
 
-## Outputs
-- `data/raw/`: source tables as CSV
-- `data/processed/eta_snapshots.csv`: point-in-time model dataset
-- `data/processed/ground_truth.csv`: separately stored labelled exception cases
-- `data/processed/validation_summary.json`: validation report
-- `data/processed/metrics.json`: model evaluation metrics
-- `models/`: trained model pipelines
+```powershell
+$env:PYTHONPATH = (Get-Location).Path
+```
 
-## Important modelling note
-The baseline prediction features are point-in-time fields known at the prediction timestamp.
-Actual delivery time and delay labels are targets only. `ground_truth.csv` is not loaded as a
-training feature. This is a synthetic demonstration, not a production carrier integration.
+Start the dashboard:
 
-## Data model and relationships
-- Carrier 1:N Shipment
-- Shipment 1:N ShipmentLeg
-- Route 1:N ShipmentLeg (a route can be reused)
-- Facility 1:N FacilityQueue
-- Shipment 1:N TrackingEvent
-- Shipment 1:N ETAEstimate
-- WeatherEvent N:M Route through RouteWeather (bridge table)
-- Shipment 1:1 ServiceLevel in this simplified dataset
-- Shipment 0:1 DelayReason for delayed shipments
+```powershell
+python -m streamlit run app/dashboard.py
+```
 
-All tables have primary identifiers. Foreign keys are checked by the validator.
+Dashboard URL:
 
-## Edge-case catalogue
-The generator adds four explicitly labelled examples to `ground_truth.csv`:
-1. Event ingestion time later than event time by an abnormal amount (late-arriving scan).
-2. Impossible event sequence / route order.
-3. A deliberately unsafe ETA snapshot marked as having future-event leakage.
-4. Delivered shipment whose current-state field is still `IN_TRANSIT`.
+http://localhost:8501
 
-These examples are isolated and labelled; the baseline model excludes the anomaly flags and
-ground-truth table. The validator reports baseline integrity and anomaly examples separately.
-"""
+## Model Performance
 
-files["src/__init__.py"] = ""
-files["src/config.py"] = """
-from pathlib import Path
+Results from the 5,000-shipment synthetic dataset:
 
-ROOT = Path(__file__).resolve().parents[1]
-RAW_DIR = ROOT / "data" / "raw"
-PROCESSED_DIR = ROOT / "data" / "processed"
-MODEL_DIR = ROOT / "models"
+### ETA Prediction Model
 
-TABLES = [
-    "carrier", "facility", "route", "service_level", "shipment",
-    "shipment_leg", "tracking_event", "facility_queue", "weather_event",
-    "route_weather", "eta_estimate", "delay_reason"
-]
+| Metric | Result |
+|---|---:|
+| Mean Absolute Error (MAE) | 3.87 hours |
+| Root Mean Squared Error (RMSE) | 5.01 hours |
+| R² Score | 0.9081 |
 
-def ensure_dirs():
-    for path in (RAW_DIR, PROCESSED_DIR, MODEL_DIR):
-        path.mkdir(parents=True, exist_ok=True)
-"""
+### Delay Classification Model
+
+| Metric | Result |
+|---|---:|
+| Accuracy | 99.10% |
+| Precision | 99.10% |
+| Recall | 100.00% |
+| F1 Score | 99.55% |
+| ROC-AUC | 0.7617 |
+
+**Note:** These results are from synthetic demonstration data. Accuracy should not be interpreted alone; ROC-AUC indicates more moderate class-discrimination performance.
+
+## Model Input Features
+
+The prediction models use the following operational features:
+
+| Feature | Description |
+|---|---|
+| planned_remaining_hours | Planned time remaining until delivery |
+| queue_pressure | Facility queue pressure |
+| weather_severity | Weather severity level |
+| carrier_reliability | Carrier reliability score |
+
+The ETA model predicts remaining delivery time, while the delay classifier estimates delivery delay risk.
+
+## Data Outputs
+
+| Directory / File | Description |
+|---|---|
+| `data/raw/` | Generated logistics source datasets |
+| `data/processed/eta_snapshots.csv` | Point-in-time model dataset |
+| `data/processed/ground_truth.csv` | Labelled exception examples |
+| `data/processed/validation_summary.json` | Data validation results |
+| `data/processed/metrics.json` | Model evaluation metrics |
+| `data/processed/checksums.json` | SHA-256 checksums |
+| `models/` | Trained Machine Learning models |
+
+## Data Model Relationships
+
+- Carrier → Shipments (one-to-many)
+- Shipment → Shipment Legs (one-to-many)
+- Route → Shipment Legs (one-to-many)
+- Facility → Facility Queues (one-to-many)
+- Shipment → Tracking Events (one-to-many)
+- Shipment → ETA Estimates (one-to-many)
+- Route ↔ Weather Events (many-to-many through RouteWeather)
+- Service Level → Shipments (one-to-many)
+
+Foreign-key relationships and timestamp integrity are checked by the validation pipeline.
+
+## Reproducibility and Data Quality
+
+The synthetic data generator uses a configurable random seed to make experiments reproducible.
+
+The validation pipeline checks data relationships, identifiers, timestamps, and other data-quality conditions.
+
+Generated validation reports and SHA-256 checksums help preserve traceability.
+
+## Run Tests
+
+Execute the project tests:
+
+```powershell
+python -m pytest -q
+```
+
+## Business Value
+
+This solution demonstrates how logistics organizations can use Machine Learning to:
+
+- Improve shipment ETA visibility.
+- Identify potentially delayed shipments.
+- Monitor operational bottlenecks.
+- Understand the impact of weather and facility queues.
+- Support proactive exception management.
+- Improve logistics planning and decision-making.
+
+## Project Limitations
+
+This is a synthetic-data hackathon demonstration. It does not currently represent a live carrier integration or a production-validated ETA service. Model performance on real-world logistics data may differ.
+
+## Author
+
+**Uttam Rangisetti**
+
+GitHub: https://github.com/UTTAM130
+
+---
+
+**Project:** Logistics ETA Prediction & Delay Intelligence  
+**Category:** Machine Learning | Data Science | Supply Chain Analytics
